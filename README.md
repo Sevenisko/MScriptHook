@@ -4,7 +4,7 @@ Mafia ScriptHook is an static library, which can be used to add more instruction
 
 ## How to use?
 
-1. Download an development package here.
+1. Download an development package [here](https://github.com/Sevenisko/MScriptHook/releases/tag/library).
 
 2. Create an new **C++ DLL** *(shared library)* project, setup the include and library paths and add MScriptHook.lib into imported libraries list and *(if possible)* change the output extension to **.asi**
 

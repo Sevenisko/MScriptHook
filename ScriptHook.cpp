@@ -91,12 +91,28 @@ MafiaScriptHook* MafiaScriptHook::GetScriptHook()
 
 		gScriptHook->RegisterInstruction("mhook_debug_break", [](std::string prototype, std::vector<std::string> args) {
 			if (!gConsoleSetup) SetupDebugConsole();
-			DebugPrintf("An debug break point has been hit.\nPress ENTER to continue execution.");
+			DebugPrintf("An debug break point on line %u has been hit.\nPress ENTER to continue execution.", GetCurrentLine());
 			SetFocus(GetConsoleWindow());
 			SetForegroundWindow(GetConsoleWindow());
 			getchar();
 			SetFocus(gGameWindow);
 			SetForegroundWindow(gGameWindow);
+			});
+
+		gScriptHook->RegisterInstruction("mhook_dump_current_script", [](std::string prototype, std::vector<std::string> args) {
+			auto script = GetCurrentProgram();
+
+			auto lines = SplitString(std::string(script->m_szSourceCode), "\n");
+
+			DebugPrintf("Complete dump of script 0x%08X\n", script);
+			DebugPrintf("================================\n");
+			int curLine = 1;
+			for (auto line : lines)
+			{
+				DebugPrintf("[%d] %s", curLine, line.c_str());
+				curLine++;
+			}
+			DebugPrintf("================================\n");
 			});
 
 		CProgramHooks::Hook();

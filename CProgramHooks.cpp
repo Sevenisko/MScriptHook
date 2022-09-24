@@ -1,6 +1,7 @@
 #include "Internal.h"
 #include "ScriptHook.h"
 #include "MinHook/MinHook.h"
+#include <map>
 
 #define INSTRUCTION_BASE_INDEX 397
 
@@ -9,15 +10,52 @@ std::vector<std::string> queueCallInstructions;
 std::vector<std::string> queueCallSignatures;
 std::vector<std::vector<std::string>> queueCallArgs;
 
- C_program__DecodeInstruction_func C_program__DecodeInstruction_original = nullptr;
- C_program__DecodeParams_func C_program__DecodeParams_original = nullptr;
- C_program__Process_func C_program__Process_original = nullptr;
- C_entity__DecodeInstruction_func C_entity__DecodeInstruction_original = nullptr;
- C_entity__DecodeParams_func C_entity__DecodeParams_original = nullptr;
+typedef C_program*(__thiscall* C_program__C_program_ctor)(C_program*);
+typedef void(__thiscall* C_program__C_program_dtor)(C_program*);
+typedef int(__thiscall* C_program__DecodeInstruction_func)(C_program*, char*, int);
+typedef int(__thiscall* C_program__DecodeParams_func)(C_program*, char*, DWORD);
+typedef void(__thiscall* C_program__Process_func)(C_program*, unsigned int);
+typedef void(__thiscall* C_program__TryChangeProgramData_func)(C_program*);
+typedef int(__thiscall* C_entity__DecodeInstruction_func)(void*, char*, int);
+typedef char(__thiscall* C_entity__DecodeParams_func)(void*, char*, DWORD);
 
-int __fastcall C_program__DecodeInstruction(void* _this, DWORD edx, char* buf, int unk)
+C_program__C_program_ctor C_program__Constructor_original = nullptr;
+C_program__C_program_dtor C_program__Destructor_original = nullptr;
+C_program__DecodeInstruction_func C_program__DecodeInstruction_original = nullptr;
+C_program__DecodeParams_func C_program__DecodeParams_original = nullptr;
+C_program__Process_func C_program__Process_original = nullptr;
+C_program__TryChangeProgramData_func C_program__TryChangeProgramData_original = nullptr;
+C_entity__DecodeInstruction_func C_entity__DecodeInstruction_original = nullptr;
+C_entity__DecodeParams_func C_entity__DecodeParams_original = nullptr;
+
+std::map<C_program*, uint32_t> compileLines;
+std::map<C_program*, uint32_t> execLines;
+
+C_program* __fastcall C_program__Constructor(C_program* _this, DWORD edx)
+{
+	DebugPrintf("Created new script processor: 0x%08X\n", _this);
+
+	compileLines.insert(std::make_pair(_this, 0));
+	execLines.insert(std::make_pair(_this, 0));
+
+	return C_program__Constructor_original(_this);
+}
+
+void __fastcall C_program__Destructor(C_program* _this, DWORD edx)
+{
+	DebugPrintf("Destroyed an script processor: 0x%08X\n", _this);
+
+	compileLines.erase(_this);
+	execLines.erase(_this);
+
+	C_program__Destructor_original(_this);
+}
+
+int __fastcall C_program__DecodeInstruction(C_program* _this, DWORD edx, char* buf, int unk)
 {
 	//DebugPrintf("C_program::DecodeInstruction(0x%08X, [%s], %d)\n", _this, buf, unk);
+
+	compileLines[_this]++;
 
 	if (strlen(buf) > 0)
 	{
@@ -41,7 +79,7 @@ int __fastcall C_program__DecodeInstruction(void* _this, DWORD edx, char* buf, i
 				return INSTRUCTION_BASE_INDEX + MafiaScriptHook::GetScriptHook()->GetIndexOfInstruction(callInstructionName);
 			}
 
-			DebugPrintf("Instruction %s not defined!\n", callInstructionName.c_str());
+			DebugPrintf("ERROR (line %d): Instruction %s is not defined\n", compileLines[_this], callInstructionName.c_str());
 			return -1;
 		}
 
@@ -53,7 +91,7 @@ int __fastcall C_program__DecodeInstruction(void* _this, DWORD edx, char* buf, i
 	return -1;
 }
 
-int __fastcall C_program__DecodeParams(void* _this, DWORD edx, char* buf, DWORD unk)
+int __fastcall C_program__DecodeParams(C_program* _this, DWORD edx, char* buf, DWORD unk)
 {
 	//DebugPrintf("C_program::DecodeParams(0x%08X, [%s], 0x%08X)\n", _this, buf, unk);
 
@@ -89,7 +127,7 @@ int __fastcall C_program__DecodeParams(void* _this, DWORD edx, char* buf, DWORD 
 				if (arg[0] == ' ') arg = arg.substr(1);
 			}
 
-			
+
 
 			queueCallSignatures.push_back(callPrototype);
 			queueCallArgs.push_back(fixedArgs);
@@ -100,21 +138,45 @@ int __fastcall C_program__DecodeParams(void* _this, DWORD edx, char* buf, DWORD 
 
 	if (!ret)
 	{
-		DebugPrintf("Compile error for instruction %s\n", callInstructionName.c_str());
+		DebugPrintf("ERROR (line %d): Failed to parse parameters for instruction %s\n", compileLines[_this], callInstructionName.c_str());
 	}
 
 	return ret;
 }
 
-void __fastcall C_program__Process(void* _this, DWORD edx, unsigned int unk)
+void __fastcall C_program__TryChangeProgramData(C_program* _this, DWORD edx)
+{
+	char* source = _this->m_szSourceCode;
+
+	//DebugPrintf("C_program::TryChangeProgramData(0x%08X): \n%s\n", _this, source);
+
+	C_program__TryChangeProgramData_original(_this);
+}
+
+C_program* gCurrentProgram = nullptr;
+
+uint32_t GetCurrentLine() 
+{
+	if (!gCurrentProgram) return 0;
+
+	return execLines[gCurrentProgram];
+}
+
+C_program* GetCurrentProgram() { return gCurrentProgram; }
+
+void __fastcall C_program__Process(C_program* _this, DWORD edx, unsigned int unk)
 {
 	//DebugPrintf("C_program::Process(0x%08X, %u)\n", _this, unk);
+
+	gCurrentProgram = _this;
+
+	execLines[_this]++;
 
 	if (!queueCallInstructions.empty())
 	{
 		if (MafiaScriptHook::GetScriptHook()->IsInstructionRegistered(queueCallInstructions.front()))
 		{
-			DebugPrintf("Executing custom instruction: [%s]\n", queueCallInstructions.front().c_str());
+			DebugPrintf("Executing custom instruction: \"%s\" on line %d\n", queueCallInstructions.front().c_str(), execLines[_this]);
 			MafiaScriptHook::GetScriptHook()->ExecuteInstruction(queueCallInstructions.front(), queueCallSignatures.front(), queueCallArgs.front());
 			queueCallInstructions.erase(queueCallInstructions.begin());
 			if (!queueCallSignatures.empty()) queueCallSignatures.erase(queueCallSignatures.begin());
@@ -123,7 +185,7 @@ void __fastcall C_program__Process(void* _this, DWORD edx, unsigned int unk)
 		}
 		else
 		{
-			DebugPrintf("Executing built-in instruction: [%s]\n", queueCallInstructions.front().c_str());
+			DebugPrintf("Executing built-in instruction \"%s\" on line %d\n", queueCallInstructions.front().c_str(), execLines[_this]);
 			queueCallInstructions.erase(queueCallInstructions.begin());
 		}
 	}
@@ -163,9 +225,12 @@ void CProgramHooks::Hook()
 
 	MH_CreateHookApi(L"user32", "CreateWindowExA", &CreateWindowExA_Hook, (LPVOID*)&CreateWindowExA_original);
 
+	MH_CreateHook((LPVOID)0x460AD0, &C_program__Constructor, (LPVOID*)&C_program__Constructor_original);
+	MH_CreateHook((LPVOID)0x460B40, &C_program__Destructor, (LPVOID*)&C_program__Destructor_original);
 	MH_CreateHook((LPVOID)0x463960, &C_program__DecodeInstruction, (LPVOID*)&C_program__DecodeInstruction_original);
 	MH_CreateHook((LPVOID)0x461C70, &C_program__DecodeParams, (LPVOID*)&C_program__DecodeParams_original);
 	MH_CreateHook((LPVOID)0x46D3B0, &C_program__Process, (LPVOID*)&C_program__Process_original);
+	MH_CreateHook((LPVOID)0x461420, &C_program__TryChangeProgramData, (LPVOID*)&C_program__TryChangeProgramData_original);
 	MH_CreateHook((LPVOID)0x51CDD0, &C_program__DecodeInstruction, (LPVOID*)&C_entity__DecodeInstruction_original);
 	MH_CreateHook((LPVOID)0x51B470, &C_program__DecodeParams, (LPVOID*)&C_entity__DecodeParams_original);
 

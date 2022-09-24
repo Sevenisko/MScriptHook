@@ -89,17 +89,38 @@ inline bool AttachToConsole()
 	return true;
 }
 
-typedef int(__thiscall* C_program__DecodeInstruction_func)(void*, char*, int);
-typedef int(__thiscall* C_program__DecodeParams_func)(void*, char*, DWORD);
-typedef void(__thiscall* C_program__Process_func)(void*, unsigned int);
-typedef int(__thiscall* C_entity__DecodeInstruction_func)(void*, char*, int);
-typedef char(__thiscall* C_entity__DecodeParams_func)(void*, char*, DWORD);
+struct C_program
+{
+	int m_iUnk0;
+	int m_iUnk1;
+	char* m_szSourceCode;
+	int m_iUnk2;
+	int m_iUnk3;
+	int m_iUnk4;
+	int m_iUnk5;
+	int m_iCurLine;
+	int m_iUnk7;
+	int m_iUnk8;
+	int m_iUnk9;
+	int m_iUnk10;
+	int m_iUnk11;
+	int m_iUnk12;
+	int m_iUnk13;
+	int m_iUnk14;
+	int m_iUnk15;
+	int m_iUnk16;
+	float* m_fVariables;
+	int m_iFloatCount;
+	void** m_pFrameVariables;
+	int m_iFrameCount;
+	void** m_pActorVariables;
+	int m_iActorCount;
+	int m_iUnk23;
+	int m_iUnk24;
+};
 
-extern C_program__DecodeInstruction_func C_program__DecodeInstruction_original;
-extern C_program__DecodeParams_func C_program__DecodeParams_original;
-extern C_program__Process_func C_program__Process_original;
-extern C_entity__DecodeInstruction_func C_entity__DecodeInstruction_original;
-extern C_entity__DecodeParams_func C_entity__DecodeParams_original;
+extern C_program* GetCurrentProgram();
+extern uint32_t GetCurrentLine();
 
 class CProgramHooks
 {

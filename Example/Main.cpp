@@ -10,7 +10,7 @@ extern "C" __declspec(dllexport) void InitializeASI()
 			MessageBoxA(NULL, args[0].c_str(), "MScriptHook Test", MB_OK | MB_ICONINFORMATION);
 		}
 		});
-	MafiaScriptHook::GetScriptHook()->RegisterInstruction("do_pice_s_procesem", [&](std::string prototype, std::vector<std::string> args) {
-		ExitProcess(0);
+	MafiaScriptHook::GetScriptHook()->RegisterInstruction("test_custom_script", [&](std::string prototype, std::vector<std::string> args) {
+		MafiaScriptHook::GetScriptHook()->ExecuteCustomScript("mhook_show_version \nmhook_debug_log \"Bruh\"");
 		});
 }

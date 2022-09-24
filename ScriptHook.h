@@ -4,12 +4,15 @@
 #include <vector>
 #include <functional>
 
-#define SCRIPTHOOK_VERSION "0.1.0-dev"
+#define SCRIPTHOOK_VERSION "1.0.0"
 
 class MafiaScriptHook
 {
 public:
 	static MafiaScriptHook* GetScriptHook();
+
+	bool ExecuteCustomScript(const std::string& script);
+	bool ExecuteCustomScriptFromFile(const std::string& fileName);
 
 	bool RegisterInstruction(const std::string& instructionName, std::function<void(std::string, std::vector<std::string>)> func);
 

@@ -5,6 +5,7 @@
 #include <io.h>
 #include <string>
 #include <vector>
+#include <map>
 
 #define SH_EXPORT __declspec(dllexport)
 
@@ -89,8 +90,72 @@ inline bool AttachToConsole()
 	return true;
 }
 
-struct C_program
+template <unsigned int address, typename... Args> void Call(Args... args) {
+	reinterpret_cast<void(__cdecl*)(Args...)>(address)(args...);
+}
+
+template <typename Ret, unsigned int address, typename... Args>  Ret CallAndReturn(Args... args) {
+	return reinterpret_cast<Ret(__cdecl*)(Args...)>(address)(args...);
+}
+
+template <typename Ret, unsigned int address, typename C, typename... Args>
+Ret CallMethodAndReturn(C _this, Args... args) {
+	static_assert(std::is_class<std::remove_pointer_t<C>>::value);
+	return reinterpret_cast<Ret(__thiscall*)(C, Args...)>(address)(_this, args...);
+}
+
+template <unsigned int address, typename C, typename... Args>
+void CallMethod(C _this, Args... args) {
+	static_assert(std::is_class<std::remove_pointer_t<C>>::value);
+	return reinterpret_cast<void(__thiscall*)(C, Args...)>(address)(_this, args...);
+}
+
+template <unsigned int tableIndex, typename C, typename... Args>
+void CallVirtualMethod(C _this, Args... args) {
+	static_assert(std::is_class<std::remove_pointer_t<C>>::value);
+	reinterpret_cast<void(__thiscall*)(C, Args...)>((*reinterpret_cast<void***>(_this))[tableIndex])(_this, args...);
+}
+
+template <typename Ret, unsigned int tableIndex, typename C, typename... Args>
+Ret CallVirtualMethodAndReturn(C _this, Args... args) {
+	static_assert(std::is_class<std::remove_pointer_t<C>>::value);
+	return reinterpret_cast<Ret(__thiscall*)(C, Args...)>((*reinterpret_cast<void***>(_this))[tableIndex])(_this, args...);
+}
+
+class C_program
 {
+public:
+	C_program()
+	{
+		CallMethod<0x460AD0, C_program*>(this);
+	}
+
+	~C_program()
+	{
+		CallMethod<0x460B40, C_program*>(this);
+	}
+
+	int DecodeInstruction(char* text, void* unk)
+	{
+		return CallMethodAndReturn<int, 0x463960, C_program*>(this, text, unk);
+	}
+	int DecodeParams(char* buf, void* unk)
+	{
+		return CallMethodAndReturn<int, 0x461C70, C_program*>(this, buf, unk);
+	}
+	void Process(uint32_t unk)
+	{
+		return CallMethod<0x46D3B0, C_program*>(this, unk);
+	}
+	void TryChangeProgramData()
+	{
+		return CallMethod<0x461420, C_program*>(this);
+	}
+	void SetSourceCode(const char* source)
+	{
+		return CallMethod<0x461530, C_program*>(this);
+	}
+
 	int m_iUnk0;
 	int m_iUnk1;
 	char* m_szSourceCode;
@@ -118,6 +183,8 @@ struct C_program
 	int m_iUnk23;
 	int m_iUnk24;
 };
+
+extern std::map<C_program*, uint32_t> execLines;
 
 extern C_program* GetCurrentProgram();
 extern uint32_t GetCurrentLine();

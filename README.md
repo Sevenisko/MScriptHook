@@ -48,7 +48,7 @@ Of course it can add custom instructions into the script, but it also has few mo
 
 - Ability to completely dump a script
 
-
+- Execute any custom script (from both string and file)
 
 ## Internal instructions
 

@@ -66,7 +66,7 @@ int __fastcall C_program__DecodeInstruction(C_program* _this, DWORD edx, char* b
 
 		callInstructionName = vec[0];
 
-		DebugPrintf("%s\n", buf);
+		//DebugPrintf("%s\n", buf);
 
 		int ret = C_program__DecodeInstruction_original(_this, buf, unk);
 
@@ -95,7 +95,7 @@ int __fastcall C_program__DecodeParams(C_program* _this, DWORD edx, char* buf, D
 {
 	//DebugPrintf("C_program::DecodeParams(0x%08X, [%s], 0x%08X)\n", _this, buf, unk);
 
-	if (!callInstructionName.empty())
+	if (!callInstructionName.empty() && MafiaScriptHook::GetScriptHook()->IsInstructionRegistered(callInstructionName))
 	{
 		std::string abuf(buf), callPrototype;
 
@@ -127,11 +127,15 @@ int __fastcall C_program__DecodeParams(C_program* _this, DWORD edx, char* buf, D
 				if (arg[0] == ' ') arg = arg.substr(1);
 			}
 
-
-
 			queueCallSignatures.push_back(callPrototype);
 			queueCallArgs.push_back(fixedArgs);
 		}
+		else
+		{
+			queueCallSignatures.push_back("");
+			queueCallArgs.push_back(std::vector<std::string>());
+		}
+		return 1;
 	}
 
 	int ret = C_program__DecodeParams_original(_this, buf, unk);
@@ -176,7 +180,7 @@ void __fastcall C_program__Process(C_program* _this, DWORD edx, unsigned int unk
 	{
 		if (MafiaScriptHook::GetScriptHook()->IsInstructionRegistered(queueCallInstructions.front()))
 		{
-			DebugPrintf("Executing custom instruction: \"%s\" on line %d\n", queueCallInstructions.front().c_str(), execLines[_this]);
+			DebugPrintf("Executing custom instruction: %s\n", queueCallInstructions.front().c_str());
 			MafiaScriptHook::GetScriptHook()->ExecuteInstruction(queueCallInstructions.front(), queueCallSignatures.front(), queueCallArgs.front());
 			queueCallInstructions.erase(queueCallInstructions.begin());
 			if (!queueCallSignatures.empty()) queueCallSignatures.erase(queueCallSignatures.begin());
@@ -185,7 +189,7 @@ void __fastcall C_program__Process(C_program* _this, DWORD edx, unsigned int unk
 		}
 		else
 		{
-			DebugPrintf("Executing built-in instruction \"%s\" on line %d\n", queueCallInstructions.front().c_str(), execLines[_this]);
+			DebugPrintf("Executing built-in instruction: %s\n", queueCallInstructions.front().c_str());
 			queueCallInstructions.erase(queueCallInstructions.begin());
 		}
 	}
@@ -231,8 +235,8 @@ void CProgramHooks::Hook()
 	MH_CreateHook((LPVOID)0x461C70, &C_program__DecodeParams, (LPVOID*)&C_program__DecodeParams_original);
 	MH_CreateHook((LPVOID)0x46D3B0, &C_program__Process, (LPVOID*)&C_program__Process_original);
 	MH_CreateHook((LPVOID)0x461420, &C_program__TryChangeProgramData, (LPVOID*)&C_program__TryChangeProgramData_original);
-	MH_CreateHook((LPVOID)0x51CDD0, &C_program__DecodeInstruction, (LPVOID*)&C_entity__DecodeInstruction_original);
-	MH_CreateHook((LPVOID)0x51B470, &C_program__DecodeParams, (LPVOID*)&C_entity__DecodeParams_original);
+	MH_CreateHook((LPVOID)0x51CDD0, &C_entity__DecodeInstruction, (LPVOID*)&C_entity__DecodeInstruction_original);
+	MH_CreateHook((LPVOID)0x51B470, &C_entity__DecodeParams, (LPVOID*)&C_entity__DecodeParams_original);
 
 	MH_EnableHook(MH_ALL_HOOKS);
 }

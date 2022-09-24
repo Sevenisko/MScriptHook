@@ -4,7 +4,7 @@
 #include <vector>
 #include <functional>
 
-#define SCRIPTHOOK_VERSION "1.0.0"
+#define SCRIPTHOOK_VERSION "1.1.0"
 
 class MafiaScriptHook
 {
